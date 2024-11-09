@@ -21,17 +21,17 @@ static int s_retry_num = 0;
 EventGroupHandle_t net_event_group;
 // net_mode_t net_mode = MODE_NONE;
 
-net_config_t net_config = {
-  .mode = MODE_NONE,
-  .dhcp= 0,
-  .ip = {0},
-  .subnet = {0},
-  .gw = {0},
-  .SSID = {0},
-  .pswd = {0},
-  .AP_SSID = {0},
-  .AP_pswd = {0},
-};
+// net_config_t net_config = {
+//   .mode = MODE_NONE,
+//   .dhcp= 0,
+//   .ip = {0},
+//   .subnet = {0},
+//   .gw = {0},
+//   .SSID = {0},
+//   .pswd = {0},
+//   .AP_SSID = {0},
+//   .AP_pswd = {0},
+// };
 
 // ///////////////////////
 // int dhcp_mode = 0;
@@ -45,6 +45,17 @@ net_config_t net_config = {
 // ///////////////////////
 // char AP_SSID[30];
 // char AP_pswd[30];
+
+char* generate_hostname(const char* prefix)
+{
+    uint8_t mac[6];
+    char   *hostname;
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    if (-1 == asprintf(&hostname, "%s-%02X%02X%02X", prefix, mac[3], mac[4], mac[5])) {
+        abort();
+    }
+    return hostname;
+}
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data) {
@@ -149,7 +160,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
   }
 }
 
-esp_netif_t *wifi_init_sta(void)
+esp_netif_t *wifi_init_sta(net_config_t net_config)
 {
   ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
   esp_netif_t *esp_netif_sta = esp_netif_create_default_wifi_sta();
@@ -188,15 +199,15 @@ esp_netif_t *wifi_init_sta(void)
     return esp_netif_sta;
 }
 
-esp_netif_t *wifi_init_softap(void)
+esp_netif_t *wifi_init_softap(net_config_t net_config)
 {
     esp_netif_t *esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     wifi_config_t wifi_ap_config = {
         .ap = {
             // .ssid = AP_SSID,
-            .ssid_len = strlen(net_config.AP_SSID),
-            .channel = ESPNOW_CHANNEL,
+            .ssid_len = strlen(net_config.AP_SSID)+10,
+            .channel = 6,
             // .password = EXAMPLE_ESP_WIFI_AP_PASSWD,
             .max_connection = MAX_STA_CONN,
             .authmode = WIFI_AUTH_WPA2_PSK,
@@ -205,22 +216,32 @@ esp_netif_t *wifi_init_softap(void)
             },
         },
     };
-  strcpy((char *)wifi_ap_config.ap.ssid, (const char *)net_config.AP_SSID);
+  char* AP_SSID = generate_hostname((const char *)net_config.AP_SSID);
+
+  strcpy((char *)wifi_ap_config.ap.ssid, (const char *)AP_SSID);
   strcpy((char *)wifi_ap_config.ap.password, (const char *)net_config.AP_pswd);
+  ESP_LOGI(TAG_AP, "AP_SSID: %s", AP_SSID);
+  ESP_LOGI(TAG_AP, "AP_pswd: %s", net_config.AP_pswd);
 
 
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_ap_config));
 
     ESP_LOGI(TAG_AP, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
-             net_config.AP_SSID, net_config.AP_pswd, ESPNOW_CHANNEL);
+             AP_SSID, net_config.AP_pswd, ESPNOW_CHANNEL);
 
     return esp_netif_ap;
 }
 
-void initNetwork() {
+void initNetwork(net_config_t net_config) {
   //print the mode
-  ESP_LOGI(TAG, "Mode: %d", net_config.mode);
+  ESP_LOGD(TAG, "Mode: %d", net_config.mode);
+  //print ssid and pswd and AP_SSID and AP_pswd
+  ESP_LOGD(TAG, "SSID: %s", net_config.SSID);
+  ESP_LOGD(TAG, "pswd: %s", net_config.pswd);
+  ESP_LOGD(TAG, "AP_SSID: %s", net_config.AP_SSID);
+  ESP_LOGD(TAG, "AP_pswd: %s", net_config.AP_pswd);
+
   ////////////////////////////////////
   //NON-VOLETILE STORAGE
   ////////////////////////////////////
@@ -357,11 +378,11 @@ void initNetwork() {
 
     /* Initialize AP */
     ESP_LOGI(TAG_AP, "ESP_WIFI_MODE_AP");
-    esp_netif_t *esp_netif_ap = wifi_init_softap();
+    esp_netif_t *esp_netif_ap = wifi_init_softap(net_config);
 
     /* Initialize STA */
     ESP_LOGI(TAG_STA, "ESP_WIFI_MODE_STA");
-    esp_netif_t *esp_netif_sta = wifi_init_sta();
+    esp_netif_t *esp_netif_sta = wifi_init_sta(net_config);
 
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
@@ -421,16 +442,6 @@ void initNetwork() {
 
 }
 
-char* generate_hostname(const char* prefix)
-{
-    uint8_t mac[6];
-    char   *hostname;
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    if (-1 == asprintf(&hostname, "%s-%02X%02X%02X", prefix, mac[3], mac[4], mac[5])) {
-        abort();
-    }
-    return hostname;
-}
 
 // start AP function
 void initAP(){

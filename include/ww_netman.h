@@ -42,6 +42,7 @@ extern "C" {
 #include "nvs_flash.h"
 
 #include <lwip/sockets.h>
+#include "lwip/lwip_napt.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "driver/gpio.h"
@@ -155,7 +156,7 @@ extern EventGroupHandle_t net_event_group;
 #define STA_CONNECTED_BIT BIT3
 
 extern char* generate_hostname(const char* prefix);
-extern void initNetwork();
+extern void initNetwork(net_config_t config);
 extern void initAP();
 
 
